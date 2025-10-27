@@ -141,7 +141,7 @@ public class DataInitializer implements CommandLineRunner {
 
                 // Accesos ADMIN
                 crearAcceso("Matrículas", "/matriculas", "fa-clipboard-list"),
-                crearAcceso("Importar Excel", "/matriculas/importar", "fa-file-excel"),
+                crearAcceso("Importar Excel", "/matriculas/importar", "fa-file-excel"),               
                 crearAcceso("Sedes", "/sedes", "fa-building"),
                 crearAcceso("Facultades", "/facultades", "fa-university"),
                 crearAcceso("Programas", "/programas", "fa-graduation-cap"),

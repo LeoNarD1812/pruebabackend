@@ -166,4 +166,23 @@ public class MatriculaController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+    @GetMapping("/descargar-plantilla")
+    public ResponseEntity<byte[]> descargarPlantilla() {
+        try {
+            byte[] excelBytes = matriculaService.descargarPlantilla();
+
+            String filename = "Plantilla_Importacion_Matriculas.xlsx";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData("attachment", filename);
+            headers.setContentLength(excelBytes.length);
+
+            return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+
+        } catch (Exception e) {
+            log.error("Error al descargar plantilla: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

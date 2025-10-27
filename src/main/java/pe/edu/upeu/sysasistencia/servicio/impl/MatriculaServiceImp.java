@@ -17,6 +17,7 @@ import pe.edu.upeu.sysasistencia.repositorio.IMatriculaRepository;
 import pe.edu.upeu.sysasistencia.repositorio.IUsuarioRepository;
 import pe.edu.upeu.sysasistencia.servicio.*;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -107,7 +108,6 @@ public class MatriculaServiceImp extends CrudGenericoServiceImp<Matricula, Long>
 
                 try {
                     procesarFila(row, i + 1, filtros, tipoPersona, result);
-                    result.setExitosos(result.getExitosos() + 1);
                 } catch (Exception e) {
                     result.setFallidos(result.getFallidos() + 1);
                     result.getErrores().add("Fila " + (i + 1) + ": " + e.getMessage());
@@ -190,11 +190,12 @@ public class MatriculaServiceImp extends CrudGenericoServiceImp<Matricula, Long>
                 throw new Exception("Nombre completo vacío - registro omitido");
             }
 
-            // Verificar si la persona ya existe
+            // ✅ CORREGIDO: Verificar si la persona ya existe - PERO CONTINUAR
             Optional<Persona> personaExistente = personaService.findByDocumento(documento);
             if (personaExistente.isPresent()) {
                 result.getWarnings().add("Fila " + rowNum + ": Persona con documento " + documento + " ya existe - registro omitido");
-                throw new Exception("Documento duplicado");
+                log.warn("Persona con documento {} ya existe en la fila {} - omitiendo registro", documento, rowNum);
+                return; // ✅ SOLO SALIR DE ESTA FILA, NO LANZAR EXCEPCIÓN
             }
 
             // Verificar entidades relacionadas (solo para estudiantes)
@@ -255,17 +256,14 @@ public class MatriculaServiceImp extends CrudGenericoServiceImp<Matricula, Long>
                         rowNum, documento, usuarioCreado.getUser());
             }
 
+            // ✅ INCREMENTAR CONTADOR DE EXITOSOS SOLO SI SE PROCESÓ CORRECTAMENTE
+            result.setExitosos(result.getExitosos() + 1);
+
         } catch (Exception e) {
             throw new Exception(e.getMessage());
         }
     }
 
-    /**
-     * ✅ NUEVO: Crear usuario automáticamente
-     * Username: correo o usuario del Excel
-     * Password: documento (encriptado)
-     * Rol: INTEGRANTE por defecto
-     */
     private Usuario crearUsuario(String correo, String documento, String usuarioExcel) throws Exception {
         // Validar que al menos tengamos documento
         if (documento == null || documento.trim().isEmpty()) {
@@ -290,32 +288,38 @@ public class MatriculaServiceImp extends CrudGenericoServiceImp<Matricula, Long>
 
         log.info("Creando usuario con username: {}", username);
 
-        // Verificar si el usuario ya existe
-        Optional<Usuario> usuarioExistente = usuarioRepository.findOneByUser(username);
-        if (usuarioExistente.isPresent()) {
-            log.warn("Usuario {} ya existe, reutilizando", username);
-            return usuarioExistente.get();
+        try {
+            // Verificar si el usuario ya existe
+            Optional<Usuario> usuarioExistente = usuarioRepository.findOneByUser(username);
+            if (usuarioExistente.isPresent()) {
+                log.warn("Usuario {} ya existe, reutilizando", username);
+                return usuarioExistente.get();
+            }
+
+            // Crear nuevo usuario
+            Usuario nuevoUsuario = new Usuario();
+            nuevoUsuario.setUser(username);
+            nuevoUsuario.setClave(passwordEncoder.encode(documento)); // Password = documento
+            nuevoUsuario.setEstado("ACTIVO");
+            nuevoUsuario = usuarioRepository.save(nuevoUsuario);
+
+            // Asignar rol INTEGRANTE por defecto
+            Rol rolIntegrante = rolService.getByNombre(Rol.RolNombre.INTEGRANTE)
+                    .orElseThrow(() -> new Exception("Rol INTEGRANTE no encontrado"));
+
+            UsuarioRol usuarioRol = UsuarioRol.builder()
+                    .usuario(nuevoUsuario)
+                    .rol(rolIntegrante)
+                    .build();
+            usuarioRolService.save(usuarioRol);
+
+            log.info("✅ Usuario creado: {} con contraseña: {}", username, documento);
+            return nuevoUsuario;
+
+        } catch (Exception e) {
+            log.error("❌ Error creando usuario {}: {}", username, e.getMessage());
+            throw new Exception("Error al crear usuario: " + e.getMessage());
         }
-
-        // Crear nuevo usuario
-        Usuario nuevoUsuario = new Usuario();
-        nuevoUsuario.setUser(username);
-        nuevoUsuario.setClave(passwordEncoder.encode(documento)); // Password = documento
-        nuevoUsuario.setEstado("ACTIVO");
-        nuevoUsuario = usuarioRepository.save(nuevoUsuario);
-
-        // Asignar rol INTEGRANTE por defecto
-        Rol rolIntegrante = rolService.getByNombre(Rol.RolNombre.INTEGRANTE)
-                .orElseThrow(() -> new Exception("Rol INTEGRANTE no encontrado"));
-
-        UsuarioRol usuarioRol = UsuarioRol.builder()
-                .usuario(nuevoUsuario)
-                .rol(rolIntegrante)
-                .build();
-        usuarioRolService.save(usuarioRol);
-
-        log.info("✅ Usuario creado: {} con contraseña: {}", username, documento);
-        return nuevoUsuario;
     }
 
     /**
@@ -500,5 +504,110 @@ public class MatriculaServiceImp extends CrudGenericoServiceImp<Matricula, Long>
 
         log.info("Exportando {} matrículas a Excel", matriculas.size());
         return excelExportService.exportarMatriculasAExcel(matriculas);
+    }
+    @Override
+    public byte[] descargarPlantilla() throws Exception {
+        try {
+            log.info("Generando plantilla de importación...");
+
+            Workbook workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("Plantilla_Importacion");
+
+            // Estilo para encabezados
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.WHITE.getIndex());
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            // Estilo para datos de ejemplo
+            CellStyle exampleStyle = workbook.createCellStyle();
+            exampleStyle.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
+            exampleStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            exampleStyle.setFont(workbook.createFont());
+
+            // Crear encabezados
+            String[] headers = {
+                    "MODO_CONTRATO", "MODALIDAD_ESTUDIO", "SEDE", "FACULTAD", "PROGRAMA_ESTUDIO",
+                    "CICLO", "GRUPO", "ID_PERSONA", "CODIGO_ESTUDIANTE", "NOMBRE_COMPLETO",
+                    "DOCUMENTO", "CORREO", "USUARIO", "CORREO_INSTITUCIONAL", "CELULAR",
+                    "PAIS", "FOTO", "RELIGION", "FECHA_NACIMIENTO", "FECHA_MATRICULA"
+            };
+
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Agregar datos de ejemplo (sin información real)
+            String[][] examples = {
+                    {
+                            "Nuevo Ingreso", "Presencial", "Filial Juliaca", "Facultad de Ingeniería y Arquitectura", "EP Ingeniería de Sistemas",
+                            "2024-I", "A", "1001", "20240001", "EJEMPLO NOMBRE APELLIDO",
+                            "87654321", "ejemplo@email.com", "usuario123", "20240001@upeu.edu.pe", "987654321",
+                            "Perú", "foto.jpg", "Católico", "15/05/2000", "07/08/2024 10:00 AM"
+                    },
+                    {
+                            "Continua", "Virtual", "Filial Juliaca", "Facultad de Ingeniería y Arquitectura", "EP Ingeniería de Sistemas",
+                            "2024-I", "B", "1002", "20240002", "OTRO EJEMPLO NOMBRE",
+                            "87654322", "otro@email.com", "usuario456", "20240002@upeu.edu.pe", "987654322",
+                            "Perú", "foto2.jpg", "Cristiano", "20/08/1999", "07/08/2024 11:30 AM"
+                    }
+            };
+
+            for (int i = 0; i < examples.length; i++) {
+                Row exampleRow = sheet.createRow(i + 1);
+                for (int j = 0; j < examples[i].length; j++) {
+                    Cell cell = exampleRow.createCell(j);
+                    cell.setCellValue(examples[i][j]);
+                    if (i == 0) { // Solo la primera fila de ejemplo con estilo
+                        cell.setCellStyle(exampleStyle);
+                    }
+                }
+            }
+
+            // Autoajustar columnas
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Agregar nota informativa
+            Row noteRow1 = sheet.createRow(examples.length + 2);
+            Cell noteCell1 = noteRow1.createCell(0);
+            noteCell1.setCellValue("INSTRUCCIONES:");
+
+            Row noteRow2 = sheet.createRow(examples.length + 3);
+            Cell noteCell2 = noteRow2.createCell(0);
+            noteCell2.setCellValue("1. Complete los datos respetando el formato de las columnas");
+
+            Row noteRow3 = sheet.createRow(examples.length + 4);
+            Cell noteCell3 = noteRow3.createCell(0);
+            noteCell3.setCellValue("2. Los campos en amarillo son ejemplos - reemplácelos con datos reales");
+
+            Row noteRow4 = sheet.createRow(examples.length + 5);
+            Cell noteCell4 = noteRow4.createCell(0);
+            noteCell4.setCellValue("3. No modifique los nombres de las columnas");
+
+            Row noteRow5 = sheet.createRow(examples.length + 6);
+            Cell noteCell5 = noteRow5.createCell(0);
+            noteCell5.setCellValue("4. El documento debe ser único para cada persona");
+
+            // Convertir a bytes
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            workbook.close();
+
+            log.info("Plantilla generada exitosamente");
+            return outputStream.toByteArray();
+
+        } catch (Exception e) {
+            log.error("Error generando plantilla: {}", e.getMessage());
+            throw new Exception("Error al generar la plantilla: " + e.getMessage());
+        }
     }
 }

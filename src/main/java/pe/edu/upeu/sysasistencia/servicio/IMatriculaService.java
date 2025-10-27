@@ -16,4 +16,6 @@ public interface IMatriculaService extends ICrudGenericoService<Matricula, Long>
     ImportResultDTO importarDesdeExcel(MultipartFile file, ImportFilterDTO filtros) throws Exception;
 
     byte[] exportarMatriculasAExcel(Long sedeId, Long facultadId, Long programaId, TipoPersona tipoPersona) throws Exception;
+
+    byte[] descargarPlantilla() throws Exception;
 }
