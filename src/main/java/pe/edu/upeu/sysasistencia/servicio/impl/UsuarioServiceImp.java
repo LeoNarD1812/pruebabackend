@@ -18,6 +18,7 @@ import pe.edu.upeu.sysasistencia.servicio.IUsuarioRolService;
 import pe.edu.upeu.sysasistencia.servicio.IUsuarioService;
 
 import java.util.Optional;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -30,6 +31,7 @@ public class UsuarioServiceImp extends CrudGenericoServiceImp<Usuario, Long> imp
     private final IUsuarioRolService iurService;
     private final PasswordEncoder passwordEncoder;
     private final UsuarioMapper userMapper;
+
 
     @Override
     protected ICrudGenericoRepository<Usuario, Long> getRepo() {
@@ -46,6 +48,18 @@ public class UsuarioServiceImp extends CrudGenericoServiceImp<Usuario, Long> imp
         }
 
         throw new ModelNotFoundException("Contraseña inválida", HttpStatus.BAD_REQUEST);
+    }
+    @Override
+    public List<Usuario> findByRol(String rolNombre) {
+        try {
+            // Convierte el nombre de rol (ej: "LIDER") a mayúsculas para asegurar la coincidencia con el ENUM/BD
+            Rol.RolNombre rolEnum = Rol.RolNombre.valueOf(rolNombre.toUpperCase());
+            // Llama al método del repositorio con el nombre del ENUM
+            return repo.findByRol(rolEnum.name());
+        } catch (IllegalArgumentException e) {
+            log.error("Rol no válido: {}", rolNombre);
+            return List.of(); // Devuelve lista vacía si el rol no existe
+        }
     }
 
     /**
