@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pe.edu.upeu.sysasistencia.dtos.EventoEspecificoDTO;
+import pe.edu.upeu.sysasistencia.dtos.RecurrenceRequestDTO;
 import pe.edu.upeu.sysasistencia.excepciones.CustomResponse;
 import pe.edu.upeu.sysasistencia.mappers.EventoEspecificoMapper;
 import pe.edu.upeu.sysasistencia.modelo.EventoEspecifico;
@@ -71,6 +72,15 @@ public class EventoEspecificoController {
     public ResponseEntity<EventoEspecificoDTO> save(@RequestBody EventoEspecificoDTO dto) {
         EventoEspecifico obj = eventoService.save(eventoMapper.toEntity(dto));
         return ResponseEntity.status(HttpStatus.CREATED).body(eventoMapper.toDTO(obj));
+    }
+
+    @PostMapping("/recurrencia") // NEW ENDPOINT
+    public ResponseEntity<List<EventoEspecificoDTO>> createRecurrence(
+            @RequestBody RecurrenceRequestDTO dto
+    ) {
+        // Delegate the complex recurrence logic to the service layer
+        List<EventoEspecifico> newEvents = eventoService.createRecurrence(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(eventoMapper.toDTOs(newEvents));
     }
 
     @PutMapping("/{id}")

@@ -38,6 +38,7 @@ public class GrupoParticipante {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", length = 20)
+    @Builder.Default
     private EstadoParticipante estado = EstadoParticipante.ACTIVO;
 
     @PrePersist

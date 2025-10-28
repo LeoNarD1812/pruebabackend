@@ -2,6 +2,7 @@ package pe.edu.upeu.sysasistencia.mappers;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 import pe.edu.upeu.sysasistencia.dtos.EventoGeneralDTO;
 import pe.edu.upeu.sysasistencia.modelo.EventoGeneral;
 
@@ -17,4 +18,19 @@ public interface EventoGeneralMapper extends GenericMapper<EventoGeneralDTO, Eve
     @Mapping(target = "programa.facultad", ignore = true)
     @Mapping(target = "programa.descripcion", ignore = true)
     EventoGeneral toEntity(EventoGeneralDTO dto);
+
+    @Named("estadoToString")
+    default String estadoToString(EventoGeneral.EstadoEvento estado) {
+        return estado != null ? estado.name() : "ACTIVO";
+    }
+
+    @Named("stringToEstado")
+    default EventoGeneral.EstadoEvento stringToEstado(String estado) {
+        if (estado == null) return EventoGeneral.EstadoEvento.ACTIVO;
+        try {
+            return EventoGeneral.EstadoEvento.valueOf(estado.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return EventoGeneral.EstadoEvento.ACTIVO;
+        }
+    }
 }

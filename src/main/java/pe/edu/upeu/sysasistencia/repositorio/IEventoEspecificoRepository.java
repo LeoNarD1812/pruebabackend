@@ -2,6 +2,7 @@ package pe.edu.upeu.sysasistencia.repositorio;
 
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import pe.edu.upeu.sysasistencia.dtos.RecurrenceRequestDTO;
 import pe.edu.upeu.sysasistencia.modelo.EventoEspecifico;
 import java.time.LocalDate;
 import java.util.List;

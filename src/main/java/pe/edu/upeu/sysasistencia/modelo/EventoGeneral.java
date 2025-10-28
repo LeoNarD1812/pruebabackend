@@ -49,6 +49,7 @@ public class EventoGeneral {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", length = 20)
+    @Builder.Default
     private EstadoEvento estado = EstadoEvento.ACTIVO;
 
     @Column(name = "created_at", updatable = false)

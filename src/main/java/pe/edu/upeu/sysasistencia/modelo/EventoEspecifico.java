@@ -49,10 +49,12 @@ public class EventoEspecifico {
     private String descripcion;
 
     @Column(name = "tolerancia_minutos")
+    @Builder.Default
     private Integer toleranciaMinutos = 10;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", length = 20)
+    @Builder.Default
     private EstadoSesion estado = EstadoSesion.PROGRAMADO;
 
     @Column(name = "created_at", updatable = false)
