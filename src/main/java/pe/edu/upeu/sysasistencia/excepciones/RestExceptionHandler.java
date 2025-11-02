@@ -48,6 +48,19 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
         );
         return new ResponseEntity<>(err, HttpStatus.BAD_REQUEST);
     }
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<CustomResponse> handleRuntimeException(RuntimeException ex, WebRequest request) {
+        CustomResponse err = new CustomResponse(
+                // Usamos 400 Bad Request para errores lógicos del cliente (datos incorrectos)
+                HttpStatus.BAD_REQUEST.value(),
+                LocalDateTime.now(),
+                // Capturamos el mensaje de negocio (ej: "El grupo ha alcanzado su capacidad máxima")
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        // Devolvemos 400 Bad Request con el mensaje de error explícito
+        return new ResponseEntity<>(err, HttpStatus.BAD_REQUEST);
+    }
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(

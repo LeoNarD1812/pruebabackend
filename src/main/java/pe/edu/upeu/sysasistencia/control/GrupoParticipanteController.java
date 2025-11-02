@@ -9,6 +9,7 @@ import pe.edu.upeu.sysasistencia.excepciones.CustomResponse;
 import pe.edu.upeu.sysasistencia.mappers.GrupoParticipanteMapper;
 import pe.edu.upeu.sysasistencia.modelo.GrupoParticipante;
 import pe.edu.upeu.sysasistencia.servicio.IGrupoParticipanteService;
+import pe.edu.upeu.sysasistencia.excepciones.ModelNotFoundException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -54,13 +55,29 @@ public class GrupoParticipanteController {
         return ResponseEntity.ok(list);
     }
 
-    @PostMapping("/agregar")
-    public ResponseEntity<GrupoParticipanteDTO> agregarParticipante(
-            @RequestParam Long grupoPequenoId,
-            @RequestParam Long personaId
-    ) {
-        GrupoParticipante obj = participanteService.agregarParticipante(grupoPequenoId, personaId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(participanteMapper.toDTO(obj));
+    @PostMapping
+    public ResponseEntity<GrupoParticipanteDTO> save(@RequestBody GrupoParticipanteDTO dto) {
+        try {
+            // El frontend envía {grupoPequenoId, personaId}. Usaremos estos campos.
+            GrupoParticipante obj = participanteService.agregarParticipante(
+                    dto.getGrupoPequenoId(),
+                    dto.getPersonaId()
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(participanteMapper.toDTO(obj));
+        } catch (ModelNotFoundException e) {
+            // Manejar 404/400 si el grupo o persona no existe
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (RuntimeException e) {
+            // MANEJO DE EXCEPCIONES DE NEGOCIO (Capacidad, Ya Inscrito)
+            CustomResponse response = new CustomResponse(
+                    HttpStatus.BAD_REQUEST.value(),
+                    LocalDateTime.now(),
+                    e.getMessage(),
+                    "Error de lógica de negocio al agregar participante"
+            );
+            // Devolver 400 Bad Request
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        }
     }
 
     @PutMapping("/remover/{id}")
